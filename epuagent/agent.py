@@ -59,7 +59,7 @@ factory = ProcessFactory(EPUAgent)
 def start(container, starttype, *args, **kwargs):
     log.info('EPUAgent starting, startup type "%s"' % starttype)
 
-    conf = ioninit.config("epu.universal")
+    conf = ioninit.config(__name__)
 
     proc = [{'name': 'epuagent', 'module': __name__, 'class': EPUAgent.__name__,
              'spawnargs':
