@@ -26,9 +26,8 @@ class EPUAgent(Process):
         # for testing, allow for not starting heartbeat automatically
         start_beat = self.spawn_args.get('start_heartbeat', True)
 
-        supd = self.spawn_args.get('supervisord')
-        if supd:
-            sock = supd['socket']
+        sock = self.spawn_args.get('supervisor_socket')
+        if sock:
             log.debug("monitoring a process supervisor at: %s", sock)
             self.supervisor = Supervisor(sock)
         else:

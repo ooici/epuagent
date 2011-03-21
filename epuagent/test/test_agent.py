@@ -191,10 +191,7 @@ class EPUAgentIntegrationTests(IonTestCase):
             'node_id': NODE_ID,
             'period_seconds': 2.0,
             'start_heartbeat': False,
-            'supervisord': {
-                'socket': socket_path
-            }
-        }
+            'supervisor_socket': socket_path}
         agent = EPUAgent(spawnargs=spawnargs)
         yield self._spawn_process(agent)
         defer.returnValue(agent)
