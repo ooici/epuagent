@@ -73,6 +73,9 @@ class EPUAgentCore(object):
                 # remove from failure list if present
                 self.fail_cache.pop(proc['name'], None)
 
+        log.debug("%d of %d supervised process(es) OK",
+                  0 if not failed else len(failed), len(procs))
+
         defer.returnValue(failed)
 
     def _one_process_failure(self, proc):

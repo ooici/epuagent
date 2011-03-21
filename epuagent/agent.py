@@ -66,7 +66,9 @@ def start(container, starttype, *args, **kwargs):
                  {'node_id': conf['node_id'],
                   'heartbeat_dest': conf['heartbeat_dest'],
                   'heartbeat_op': conf.getValue('heartbeat_op', 'heartbeat'),
-                  'period_seconds': conf.getValue('heartbeat_period', 5.0)}
+                  'period_seconds': conf.getValue('heartbeat_period', 5.0),
+                  'supervisor_socket' : conf.getValue('supervisor_socket'),
+             }
             }]
 
     app_supv_desc = ProcessDesc(name='EPUAgent app supervisor',
