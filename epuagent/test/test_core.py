@@ -22,16 +22,16 @@ class EPUAgentCoreTests(unittest.TestCase):
         self.sup = FakeSupervisor()
         self.core = EPUAgentCore(NODE_ID, supervisor=self.sup)
 
-    def assertBasics(self, state, error=False):
+    def assertBasics(self, state, expected="OK"):
         self.assertEqual(NODE_ID, state['node_id'])
         self.assertTrue(state['timestamp'])
-        self.assertEqual("ERROR" if error else "OK", state['state'])
+        self.assertEqual(expected, state['state'])
 
     @defer.inlineCallbacks
     def test_supervisor_error(self):
         self.sup.error = SupervisorError('faaaaaaaail')
         state = yield self.core.get_state()
-        self.assertBasics(state, error=True)
+        self.assertBasics(state, "MONITOR_ERROR")
         self.assertTrue('faaaaaaaail' in state['error'])
 
     @defer.inlineCallbacks
@@ -55,7 +55,7 @@ class EPUAgentCoreTests(unittest.TestCase):
         finally:
             os.unlink(err_path)
             
-        self.assertBasics(state, error=True)
+        self.assertBasics(state, "PROCESS_ERROR")
 
         failed_processes = state['failed_processes']
         self.assertEqual(1, len(failed_processes))
@@ -64,7 +64,7 @@ class EPUAgentCoreTests(unittest.TestCase):
 
         # next time around process should still be failed but no stderr
         state = yield self.core.get_state()
-        self.assertBasics(state, error=True)
+        self.assertBasics(state, "PROCESS_ERROR")
         failed_processes = state['failed_processes']
         self.assertEqual(1, len(failed_processes))
         failed = failed_processes[0]

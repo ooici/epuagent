@@ -27,10 +27,12 @@ SUPERVISORD_CONF = """
 [program:proc1]
 command=/bin/cat
 autorestart=false
+startsecs=0
 
 [program:proc2]
 command=/bin/cat
 autorestart=false
+startsecs=0
 
 [unix_http_server]
 file=%(here)s/supervisor.sock
@@ -108,7 +110,7 @@ class EPUAgentIntegrationTests(IonTestCase):
 
         self.assertEqual(1, self.subscriber.beat_count)
 
-        self.assertBasics(self.subscriber.last_beat, error=True)
+        self.assertBasics(self.subscriber.last_beat, "MONITOR_ERROR")
         log.debug(self.subscriber.last_beat)
 
     
@@ -116,6 +118,7 @@ class EPUAgentIntegrationTests(IonTestCase):
     def test_everything(self):
 
         yield self._setup_supervisord()
+        log.debug("supervisord started")
 
         sock = os.path.join(self.tmpdir, "supervisor.sock")
         self.supervisor = Supervisor(sock)
@@ -130,7 +133,7 @@ class EPUAgentIntegrationTests(IonTestCase):
             self.assertEqual(i+1, self.subscriber.beat_count)
             self.assertBasics(self.subscriber.last_beat)
 
-        yield procutils.asleep(1.01)
+        #yield procutils.asleep(1.01)
 
         # now kill a process and see that it is reflected in heartbeat
 
@@ -154,7 +157,7 @@ class EPUAgentIntegrationTests(IonTestCase):
 
         yield agent.heartbeat()
         yield self.subscriber.deferred
-        self.assertBasics(self.subscriber.last_beat, error=True)
+        self.assertBasics(self.subscriber.last_beat, "PROCESS_ERROR")
 
         failed_processes = self.subscriber.last_beat['failed_processes']
         self.assertEqual(1, len(failed_processes))
@@ -196,10 +199,10 @@ class EPUAgentIntegrationTests(IonTestCase):
         yield self._spawn_process(agent)
         defer.returnValue(agent)
 
-    def assertBasics(self, state, error=False):
+    def assertBasics(self, state, expected="OK"):
         self.assertEqual(NODE_ID, state['node_id'])
         self.assertTrue(state['timestamp'])
-        self.assertEqual("ERROR" if error else "OK", state['state'])
+        self.assertEqual(expected, state['state'])
 
 
 class TestSubscriber(Process):

@@ -29,7 +29,6 @@ class EPUAgentCore(object):
         sup_errors = yield self._supervisor_errors()
         if sup_errors:
             state.update(sup_errors)
-            state['state'] = 'ERROR'
         else:
             state['state'] = 'OK'
         defer.returnValue(state)
@@ -45,14 +44,14 @@ class EPUAgentCore(object):
             failed = yield self._failed_processes()
 
             if failed:
-                ret = {'failed_processes' : failed}
+                ret = {'state' : 'PROCESS_ERROR', 'failed_processes' : failed}
             else:
                 ret = None
             defer.returnValue(ret)
 
         except SupervisorError, e:
             log.error("Error querying supervisord: %s", e)
-            ret = {'error' : str(e)}
+            ret = {'state' : 'MONITOR_ERROR', 'error' : str(e)}
             defer.returnValue(ret)
 
     @defer.inlineCallbacks
