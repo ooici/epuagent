@@ -28,11 +28,11 @@ setupdict = {
 from setuptools import setup, find_packages
 setupdict['packages'] = find_packages()
 
-setupdict['dependency_links'] = ['http://ooici.net/packages']
+setupdict['dependency_links'] = ['http://ooici.net/releases']
 setupdict['test_suite'] = 'epuagent'
 #setupdict['include_package_data'] = True
 #setupdict['package_data'] = {
 #    'epu': ['data/*.sqlt', 'data/install.sh']
-setupdict['install_requires'] = ['ioncore==0.4.4']
+setupdict['install_requires'] = ['ioncore==0.4.7']
 
 setup(**setupdict)
