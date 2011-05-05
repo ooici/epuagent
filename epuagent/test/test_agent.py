@@ -80,7 +80,7 @@ class EPUAgentIntegrationTests(IonTestCase):
             # shutting down takes awhile..
             sock = os.path.join(self.tmpdir, "supervisor.sock")
             i = 0
-            while os.path.exists(sock) and i < 10:
+            while os.path.exists(sock) and i < 100:
                 yield procutils.asleep(0.1)
                 i += 1
 
@@ -95,7 +95,7 @@ class EPUAgentIntegrationTests(IonTestCase):
                 pass
             try:
                 os.rmdir(self.tmpdir)
-            except IOError, e:
+            except OSError, e:
                 log.warn("Failed to remove test temp dir %s: %s", self.tmpdir, e)
 
     @defer.inlineCallbacks
@@ -133,8 +133,6 @@ class EPUAgentIntegrationTests(IonTestCase):
             self.assertEqual(i+1, self.subscriber.beat_count)
             self.assertBasics(self.subscriber.last_beat)
 
-        #yield procutils.asleep(1.01)
-
         # now kill a process and see that it is reflected in heartbeat
 
         # use backdoor supervisor client to find PID
@@ -154,6 +152,16 @@ class EPUAgentIntegrationTests(IonTestCase):
 
         log.debug("Killing process %s", pid)
         os.kill(pid, signal.SIGTERM)
+        dead = False
+        tries = 100
+        while not dead and tries:
+            yield procutils.asleep(0.05)
+            try:
+                os.kill(pid, 0)
+            except OSError:
+                dead = True
+            tries -= 1
+        self.assertTrue(dead, "process didn't die!")
 
         yield agent.heartbeat()
         yield self.subscriber.deferred
