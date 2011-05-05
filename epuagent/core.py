@@ -91,7 +91,8 @@ class EPUAgentCore(object):
                    'statename': proc.get('statename'),
                    'exitcode': proc.get('exitstatus'),
                    'stop_timestamp': proc.get('stop') or None,
-                   'error': proc.get('spawnerr')}
+                   'error': proc.get('spawnerr'),
+                   'error_time' : time.time()}
 
         # store in cache then make a copy and add detailed error info
         # only want that the first time
