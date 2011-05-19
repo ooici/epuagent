@@ -28,11 +28,15 @@ SUPERVISORD_CONF = """
 command=/bin/cat
 autorestart=false
 startsecs=0
+stdout_logfile=NONE
+stderr_logfile=NONE
 
 [program:proc2]
 command=/bin/cat
 autorestart=false
 startsecs=0
+stdout_logfile=NONE
+stderr_logfile=NONE
 
 [unix_http_server]
 file=%(here)s/supervisor.sock
