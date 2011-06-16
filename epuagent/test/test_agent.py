@@ -6,16 +6,13 @@ import os
 
 import twisted.internet.utils
 from twisted.internet import defer
+from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
-from ion.core import ioninit
 from ion.util import procutils
 
 from epuagent.agent import EPUAgent
 from epuagent.supervisor import Supervisor
-
-CONF = ioninit.config(__name__)
-from ion.util.itv_decorator import itv
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -60,7 +57,6 @@ class EPUAgentIntegrationTests(IonTestCase):
     (easy_install supervisor)
     """
 
-    @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -116,7 +112,6 @@ class EPUAgentIntegrationTests(IonTestCase):
 
         self.assertBasics(self.subscriber.last_beat, "MONITOR_ERROR")
         log.debug(self.subscriber.last_beat)
-
     
     @defer.inlineCallbacks
     def test_everything(self):
@@ -180,7 +175,7 @@ class EPUAgentIntegrationTests(IonTestCase):
     def _setup_supervisord(self):
         supd_exe = which('supervisord')
         if not supd_exe:
-            self.fail("supervisord executable not found in path!")
+            raise unittest.SkipTest("Skipping: supervisord executable not found in path")
 
         self.tmpdir = tempfile.mkdtemp()
 
