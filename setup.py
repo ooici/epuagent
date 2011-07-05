@@ -33,6 +33,6 @@ setupdict['test_suite'] = 'epuagent'
 #setupdict['include_package_data'] = True
 #setupdict['package_data'] = {
 #    'epu': ['data/*.sqlt', 'data/install.sh']
-setupdict['install_requires'] = ['ioncore==0.4.34']
+setupdict['install_requires'] = ['ioncore==0.4.35']
 
 setup(**setupdict)
