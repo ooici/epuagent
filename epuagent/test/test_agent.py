@@ -112,6 +112,20 @@ class EPUAgentIntegrationTests(IonTestCase):
 
         self.assertBasics(self.subscriber.last_beat, "MONITOR_ERROR")
         log.debug(self.subscriber.last_beat)
+
+    @defer.inlineCallbacks
+    def test_send_error(self):
+        # just ensure exception doesn't bubble up where it would
+        # terminate the LoopingCall
+
+        sock = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
+        agent = yield self._setup_agent(sock)
+
+        def fake_send(*args, **kwargs):
+            return defer.fail(Exception("world exploded"))
+        self.patch(agent, 'send', fake_send)
+
+        yield agent.heartbeat()
     
     @defer.inlineCallbacks
     def test_everything(self):

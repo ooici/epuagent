@@ -49,8 +49,19 @@ class EPUAgent(Process):
 
     @defer.inlineCallbacks
     def heartbeat(self):
-        state = yield self.core.get_state()
-        yield self.send(self.heartbeat_dest, self.heartbeat_op, state)
+        try:
+            state = yield self.core.get_state()
+            yield self.send(self.heartbeat_dest, self.heartbeat_op, state)
+
+            # This is an unfortunate hack to work around a memory leak in ion.
+            # Some caches are only cleared after a received message is handled.
+            # Since this process sends messages "spontaneously" -- triggered by a
+            # LoopingCall -- we must manually clear the cache.
+            self.message_client.workbench.manage_workbench_cache('Default Context')
+
+        except Exception, e:
+            # unhandled exceptions will terminate the LoopingCall
+            log.error('Error heartbeating: %s', e, exc_info=True)
 
 factory = ProcessFactory(EPUAgent)
 
