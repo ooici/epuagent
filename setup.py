@@ -7,7 +7,7 @@
 
 setupdict = {
     'name' : 'epuagent',
-    'version' : '0.4.3',
+    'version' : '1.1.0',
     'description' : 'OOICI CEI Elastic Processing Unit Agents',
     'url': 'https://confluence.oceanobservatories.org/display/CIDev/Common+Execution+Infrastructure+Development',
     'download_url' : 'http://ooici.net/packages',
@@ -33,6 +33,6 @@ setupdict['test_suite'] = 'epuagent'
 #setupdict['include_package_data'] = True
 #setupdict['package_data'] = {
 #    'epu': ['data/*.sqlt', 'data/install.sh']
-setupdict['install_requires'] = ['ioncore<1.1']
+setupdict['install_requires'] = ['ioncore<1.2']
 
 setup(**setupdict)
