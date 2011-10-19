@@ -7,7 +7,7 @@
 
 setupdict = {
     'name' : 'epuagent',
-    'version' : '0.4.3',
+    'version' : '1.0.0',
     'description' : 'OOICI CEI Elastic Processing Unit Agents',
     'url': 'https://confluence.oceanobservatories.org/display/CIDev/Common+Execution+Infrastructure+Development',
     'download_url' : 'http://ooici.net/packages',
