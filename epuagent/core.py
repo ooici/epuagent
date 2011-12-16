@@ -1,11 +1,9 @@
 import time
-
-from twisted.internet import defer
+import logging
 
 from epuagent.supervisor import RUNNING_STATES, SupervisorError
 
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 class EPUAgentCore(object):
     """Core state detection of EPU Agent
@@ -19,44 +17,41 @@ class EPUAgentCore(object):
         # process is still dead. Cache it here.
         self.fail_cache = {}
 
-    @defer.inlineCallbacks
     def get_state(self):
         state = self._base_state()
 
         if not self.supervisor:
-            defer.returnValue(state)
+            return state
 
-        sup_errors = yield self._supervisor_errors()
+        sup_errors = self._supervisor_errors()
         if sup_errors:
             state.update(sup_errors)
         else:
             state['state'] = 'OK'
-        defer.returnValue(state)
+        return state
 
     def _base_state(self):
         return {'node_id' : self.node_id,
                 'timestamp' : time.time(),
         }
 
-    @defer.inlineCallbacks
     def _supervisor_errors(self):
         try:
-            failed = yield self._failed_processes()
+            failed = self._failed_processes()
 
             if failed:
                 ret = {'state' : 'PROCESS_ERROR', 'failed_processes' : failed}
             else:
                 ret = None
-            defer.returnValue(ret)
+            return ret
 
         except SupervisorError, e:
             log.error("Error querying supervisord: %s", e)
             ret = {'state' : 'MONITOR_ERROR', 'error' : str(e)}
-            defer.returnValue(ret)
+            return ret
 
-    @defer.inlineCallbacks
     def _failed_processes(self):
-        procs = yield self.supervisor.query()
+        procs = self.supervisor.query()
 
         failed = None
         for proc in procs:
@@ -76,7 +71,7 @@ class EPUAgentCore(object):
         log.debug("%d of %d supervised process(es) OK",
                   nprocs if not failed else nprocs-len(failed), nprocs)
 
-        defer.returnValue(failed)
+        return failed
 
     def _one_process_failure(self, proc):
         name = proc['name']

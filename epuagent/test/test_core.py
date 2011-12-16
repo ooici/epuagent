@@ -1,19 +1,17 @@
 import os
-import tempfile
 import uuid
+import logging
+import tempfile
+import unittest
 
-from twisted.trial import unittest
-from twisted.internet import defer
-
-from ion.core import ioninit
+#from ion.core import ioninit
 
 from epuagent.core import EPUAgentCore
 from epuagent.supervisor import SupervisorError, ProcessStates
 
-CONF = ioninit.config(__name__)
+#CONF = ioninit.config(__name__)
 
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 NODE_ID = "the_node_id"
 
@@ -27,18 +25,16 @@ class EPUAgentCoreTests(unittest.TestCase):
         self.assertTrue(state['timestamp'])
         self.assertEqual(expected, state['state'])
 
-    @defer.inlineCallbacks
     def test_supervisor_error(self):
         self.sup.error = SupervisorError('faaaaaaaail')
-        state = yield self.core.get_state()
+        state = self.core.get_state()
         self.assertBasics(state, "MONITOR_ERROR")
         self.assertTrue('faaaaaaaail' in state['error'])
 
-    @defer.inlineCallbacks
     def test_series(self):
         self.sup.processes = [_one_process(ProcessStates.RUNNING),
                               _one_process(ProcessStates.RUNNING)]
-        state = yield self.core.get_state()
+        state = self.core.get_state()
         self.assertBasics(state)
 
         # mark one of the processes as failed and give it a fake logfile
@@ -51,7 +47,7 @@ class EPUAgentCoreTests(unittest.TestCase):
         err_path = _write_tempfile(stderr)
         fail['stderr_logfile'] = err_path
         try:
-            state = yield self.core.get_state()
+            state = self.core.get_state()
         finally:
             os.unlink(err_path)
             
@@ -63,7 +59,7 @@ class EPUAgentCoreTests(unittest.TestCase):
         self.assertEqual(stderr, failed['stderr'])
 
         # next time around process should still be failed but no stderr
-        state = yield self.core.get_state()
+        state = self.core.get_state()
         self.assertBasics(state, "PROCESS_ERROR")
         failed_processes = state['failed_processes']
         self.assertEqual(1, len(failed_processes))
@@ -72,7 +68,7 @@ class EPUAgentCoreTests(unittest.TestCase):
 
         # make it all ok again
         fail['state'] = ProcessStates.RUNNING
-        state = yield self.core.get_state()
+        state = self.core.get_state()
         self.assertBasics(state)
 
 def _one_process(state, exitstatus=0, spawnerr=''):
@@ -97,5 +93,5 @@ class FakeSupervisor(object):
 
     def query(self):
         if self.error:
-            return defer.fail(self.error)
-        return defer.succeed(self.processes)
+            raise self.error
+        return self.processes

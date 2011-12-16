@@ -1,21 +1,25 @@
+import gevent
+import gevent.monkey ; gevent.monkey.patch_all()
+
 import signal
 import uuid
+import logging
 import tempfile
-from ion.core.process.process import Process
+import unittest
+import threading
+import subprocess
 import os
 
-import twisted.internet.utils
-from twisted.internet import defer
-from twisted.trial import unittest
+from time import sleep
 
-from ion.test.iontest import IonTestCase
-from ion.util import procutils
+import dashi.bootstrap as bootstrap
 
 from epuagent.agent import EPUAgent
 from epuagent.supervisor import Supervisor
 
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
+
 
 NODE_ID = "the_node_id"
 
@@ -49,7 +53,7 @@ supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 serverurl=unix://%(here)s/supervisor.sock
 """
 
-class EPUAgentIntegrationTests(IonTestCase):
+class EPUAgentIntegrationTests(unittest.TestCase):
     """Integration tests for EPU Agent
 
     Uses real ION messaging, real supervisord, and real child processes.
@@ -57,23 +61,21 @@ class EPUAgentIntegrationTests(IonTestCase):
     (easy_install supervisor)
     """
 
-    @defer.inlineCallbacks
     def setUp(self):
-        yield self._start_container()
-        self.subscriber = TestSubscriber()
-        self.subscriber_id = yield self._spawn_process(self.subscriber)
+        self.amqp_uri = "memory://test"
+        self.subscriber = TestSubscriber(amqp_uri=self.amqp_uri)
+        self.subscriber_glet = gevent.spawn(self.subscriber.start)
 
         self.tmpdir = None
         self.supervisor = None
 
-    @defer.inlineCallbacks
     def tearDown(self):
-        yield self._shutdown_processes()
-        yield self._stop_container()
+        if self.subscriber_glet:
+           self.subscriber_glet.kill()
 
         if self.supervisor:
             try:
-                yield self.supervisor.shutdown()
+                self.supervisor.shutdown()
             except:
                 pass
 
@@ -81,7 +83,7 @@ class EPUAgentIntegrationTests(IonTestCase):
             sock = os.path.join(self.tmpdir, "supervisor.sock")
             i = 0
             while os.path.exists(sock) and i < 100:
-                yield procutils.asleep(0.1)
+                sleep(0.1)
                 i += 1
 
         if self.tmpdir and os.path.exists(self.tmpdir):
@@ -98,50 +100,54 @@ class EPUAgentIntegrationTests(IonTestCase):
             except OSError, e:
                 log.warn("Failed to remove test temp dir %s: %s", self.tmpdir, e)
 
-    @defer.inlineCallbacks
     def test_no_supervisor(self):
 
         # make up a nonexistent path
         sock = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
-        agent = yield self._setup_agent(sock)
+        sock = "unix://%s" % sock
+        agent = self._setup_agent(sock)
 
-        yield agent.heartbeat()
-        yield self.subscriber.deferred
+        self.subscriber.started.wait()
+        agent.heartbeat()
+        self.subscriber.did_beat.wait()
+        self.subscriber.did_beat.clear()
 
         self.assertEqual(1, self.subscriber.beat_count)
 
         self.assertBasics(self.subscriber.last_beat, "MONITOR_ERROR")
         log.debug(self.subscriber.last_beat)
 
-    @defer.inlineCallbacks
     def test_send_error(self):
         # just ensure exception doesn't bubble up where it would
         # terminate the LoopingCall
 
         sock = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
-        agent = yield self._setup_agent(sock)
+        sock = "unix://%s" % sock
+        agent = self._setup_agent(sock)
 
         def fake_send(*args, **kwargs):
-            return defer.fail(Exception("world exploded"))
-        self.patch(agent, 'send', fake_send)
+            raise Exception("world exploded")
+        agent.send = fake_send
 
-        yield agent.heartbeat()
+        agent.heartbeat()
     
-    @defer.inlineCallbacks
     def test_everything(self):
 
-        yield self._setup_supervisord()
+        self._setup_supervisord()
         log.debug("supervisord started")
 
         sock = os.path.join(self.tmpdir, "supervisor.sock")
+        sock = "unix://%s" % sock
         self.supervisor = Supervisor(sock)
 
-        agent = yield self._setup_agent(sock)
+        agent = self._setup_agent(sock)
 
         for i in range(3):
             # automatic heartbeat is turned off so we don't deal with time
-            yield agent.heartbeat()
-            yield self.subscriber.deferred
+            agent.heartbeat()
+            sleep(0.1)
+            self.subscriber.did_beat.wait()
+            self.subscriber.did_beat.clear()
 
             self.assertEqual(i+1, self.subscriber.beat_count)
             self.assertBasics(self.subscriber.last_beat)
@@ -149,7 +155,7 @@ class EPUAgentIntegrationTests(IonTestCase):
         # now kill a process and see that it is reflected in heartbeat
 
         # use backdoor supervisor client to find PID
-        procs = yield self.supervisor.query()
+        procs = self.supervisor.query()
         self.assertEqual(2, len(procs))
         if procs[0]['name'] == 'proc1':
             proc1 = procs[0]
@@ -168,7 +174,7 @@ class EPUAgentIntegrationTests(IonTestCase):
         dead = False
         tries = 100
         while not dead and tries:
-            yield procutils.asleep(0.05)
+            sleep(0.05)
             try:
                 os.kill(pid, 0)
             except OSError:
@@ -176,8 +182,9 @@ class EPUAgentIntegrationTests(IonTestCase):
             tries -= 1
         self.assertTrue(dead, "process didn't die!")
 
-        yield agent.heartbeat()
-        yield self.subscriber.deferred
+        agent.heartbeat()
+        self.subscriber.did_beat.wait()
+        self.subscriber.did_beat.clear()
         self.assertBasics(self.subscriber.last_beat, "PROCESS_ERROR")
 
         failed_processes = self.subscriber.last_beat['failed_processes']
@@ -185,7 +192,6 @@ class EPUAgentIntegrationTests(IonTestCase):
         failed = failed_processes[0]
         self.assertEqual("proc1", failed['name'])
 
-    @defer.inlineCallbacks
     def _setup_supervisord(self):
         supd_exe = which('supervisord')
         if not supd_exe:
@@ -203,22 +209,21 @@ class EPUAgentIntegrationTests(IonTestCase):
             if f:
                 f.close()
 
-        rc = yield twisted.internet.utils.getProcessValue(supd_exe,
-                                                          args=('-c', conf))
+        rc = subprocess.call([supd_exe, '-c', conf])
         self.assertEqual(0, rc, "supervisord didn't start ok!")
 
-    @defer.inlineCallbacks
     def _setup_agent(self, socket_path):
         spawnargs = {
-            'heartbeat_dest': self.subscriber_id,
+            'heartbeat_dest': self.subscriber.id,
             'heartbeat_op': 'beat',
             'node_id': NODE_ID,
             'period_seconds': 2.0,
             'start_heartbeat': False,
-            'supervisor_socket': socket_path}
-        agent = EPUAgent(spawnargs=spawnargs)
-        yield self._spawn_process(agent)
-        defer.returnValue(agent)
+            'supervisor_socket': socket_path,
+            'amqp_uri': self.amqp_uri}
+        agent = EPUAgent(**spawnargs)
+        agent_glet = gevent.spawn(agent.start)
+        return agent
 
     def assertBasics(self, state, expected="OK"):
         self.assertEqual(NODE_ID, state['node_id'])
@@ -226,20 +231,30 @@ class EPUAgentIntegrationTests(IonTestCase):
         self.assertEqual(expected, state['state'])
 
 
-class TestSubscriber(Process):
+class TestSubscriber(object):
     def __init__(self, *args, **kwargs):
-        Process.__init__(self, *args, **kwargs)
+        amqp_uri = kwargs.get('amqp_uri')
+        self.id = "subscriber-%s" % uuid.uuid4()
         self.last_beat = None
         self.beat_count = 0
-        self.deferred = defer.Deferred()
+        self.started = threading.Event()
+        self.did_beat = threading.Event()
+        self.dashi = bootstrap.dashi_connect(self.id, amqp_uri=amqp_uri)
 
-    def op_beat(self, content, headers, msg):
-        log.info('Got heartbeat: %s', content)
-        self.last_beat = content
+    def start(self):
+
+        self.dashi.handle(self.beat)
+        self.started.set()
+        try:
+            self.dashi.consume()
+        except gevent.GreenletExit:
+            log.info("Exiting '%s'" % self.id)
+
+    def beat(self, state=None):
+        log.info('Got heartbeat: %s', state)
+        self.last_beat = state
         self.beat_count += 1
-        self.deferred.callback(content)
-        self.deferred = defer.Deferred()
-
+        self.did_beat.set()
 
 def _one_process(state, exitstatus=0, spawnerr=''):
     return {'name' : str(uuid.uuid4()), 'state' : state,

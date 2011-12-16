@@ -1,32 +1,48 @@
-from twisted.internet import defer
-from twisted.internet.task import LoopingCall
+import uuid
+import logging
 
-from ion.core.process.process import Process, ProcessFactory
-from ion.core.pack import app_supervisor
-from ion.core.process.process import ProcessDesc
-from ion.core import ioninit
+import dashi.bootstrap as bootstrap
+from dashi.util import LoopingCall 
 
 from epuagent.supervisor import Supervisor
 from epuagent.core import EPUAgentCore
+from epuagent.util import get_config_paths
 
-import ion.util.ionlog
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
 
-log = ion.util.ionlog.getLogger(__name__)
-
-class EPUAgent(Process):
+class EPUAgent(object):
     """Elastic Process Unit (EPU) Agent. Monitors vitals in running VMs.
     """
 
-    def plc_init(self):
-        self.heartbeat_dest = self.spawn_args['heartbeat_dest']
-        self.heartbeat_op = self.spawn_args['heartbeat_op']
-        self.node_id = self.spawn_args['node_id']
-        self.period = float(self.spawn_args['period_seconds'])
+    def __init__(self, *args, **kwargs):
+
+        configs = ["epuagent"]
+        config_files = get_config_paths(configs)
+        self.CFG = bootstrap.configure(config_files)
+
+        topic = self.CFG.epuagent.get('service_name')
+        self.topic = topic or "epu_agent_%s" % uuid.uuid4()
+
+        heartbeat_dest = kwargs.get('heartbeat_dest')
+        self.heartbeat_dest = heartbeat_dest or self.CFG.epuagent.heartbeat_dest
+
+        node_id = kwargs.get('node_id')
+        self.node_id = node_id or self.CFG.epuagent.node_id
+
+        heartbeat_op = kwargs.get('heartbeat_op')
+        self.heartbeat_op = heartbeat_op or self.CFG.epuagent.heartbeat_op
+
+        period = kwargs.get('period_seconds')
+        self.period = float(period or self.CFG.epuagent.period_seconds)
 
         # for testing, allow for not starting heartbeat automatically
-        start_beat = self.spawn_args.get('start_heartbeat', True)
+        self.start_beat = kwargs.get('start_heartbeat', True)
 
-        sock = self.spawn_args.get('supervisor_socket')
+        amqp_uri = kwargs.get('amqp_uri')
+
+        sock = kwargs.get('supervisor_socket')
+        sock = sock or self.CFG.epuagent.get('supervisor_socket')
         if sock:
             log.debug("monitoring a process supervisor at: %s", sock)
             self.supervisor = Supervisor(sock)
@@ -36,61 +52,40 @@ class EPUAgent(Process):
 
         self.core = EPUAgentCore(self.node_id, supervisor=self.supervisor)
 
+        self.dashi = bootstrap.dashi_connect(self.topic, self.CFG, amqp_uri)
+
+    def start(self):
+        log.info('EPUAgent starting')
+
+        self.dashi.handle(self.heartbeat)
+
         self.loop = LoopingCall(self._loop)
-        if start_beat:
+        if self.start_beat:
             log.debug('Starting heartbeat loop - %s second interval', self.period)
             self.loop.start(self.period)
 
-    def plc_terminate(self):
-        self.loop.stop()
+        try:
+            self.dashi.consume()
+        except KeyboardInterrupt:
+            log.warning("Caught terminate signal. Exiting")
+        else:
+            log.info("Exiting normally.")
+
 
     def _loop(self):
         return self.heartbeat()
 
-    @defer.inlineCallbacks
     def heartbeat(self):
         try:
-            state = yield self.core.get_state()
-            yield self.send(self.heartbeat_dest, self.heartbeat_op, state)
-
-            # This is an unfortunate hack to work around a memory leak in ion.
-            # Some caches are only cleared after a received message is handled.
-            # Since this process sends messages "spontaneously" -- triggered by a
-            # LoopingCall -- we must manually clear the cache.
-            self.message_client.workbench.manage_workbench_cache('Default Context')
-
+            state = self.core.get_state()
+            self.dashi.fire(self.heartbeat_dest, self.heartbeat_op, state=state)
         except Exception, e:
             # unhandled exceptions will terminate the LoopingCall
             log.error('Error heartbeating: %s', e, exc_info=True)
 
-factory = ProcessFactory(EPUAgent)
+def main():
+    epuagent = EPUAgent()
+    epuagent.start()
 
-@defer.inlineCallbacks
-def start(container, starttype, *args, **kwargs):
-    log.info('EPUAgent starting, startup type "%s"' % starttype)
-
-    conf = ioninit.config(__name__)
-
-    proc = [{'name': 'epuagent', 'module': __name__, 'class': EPUAgent.__name__,
-             'spawnargs':
-                 {'node_id': conf['node_id'],
-                  'heartbeat_dest': conf['heartbeat_dest'],
-                  'heartbeat_op': conf.getValue('heartbeat_op', 'heartbeat'),
-                  'period_seconds': conf.getValue('heartbeat_period', 5.0),
-                  'supervisor_socket' : conf.getValue('supervisor_socket'),
-             }
-            }]
-
-    app_supv_desc = ProcessDesc(name='EPUAgent app supervisor',
-                                module=app_supervisor.__name__,
-                                spawnargs={'spawn-procs': proc})
-
-    supv_id = yield app_supv_desc.spawn()
-
-    res = (supv_id.full, [app_supv_desc])
-    defer.returnValue(res)
-
-def stop(container, state):
-    log.info('EPUAgent stopping, state "%s"' % str(state))
-    supdesc = state[0]
-    return supdesc.terminate()
+if __name__ == "__main__":
+    main()

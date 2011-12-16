@@ -1,0 +1,12 @@
+server:                                                                         
+  amqp:                                                                         
+    host: localhost                                                             
+    port: 5672                                                                  
+    username: guest                                                             
+    password: guest                                                             
+    vhost: /                                                                    
+    heartbeat: 30 
+epuagent:
+  service_name: epu_agent_service
+  heartbeat_op: heartbeat
+  period_seconds: 0.5

@@ -1,18 +1,13 @@
-import uuid
 import os
+import uuid
 import tempfile
+import unittest
 
-from twisted.trial import unittest
-from twisted.internet.error import ConnectError
+from epuagent.supervisor import Supervisor, SupervisorError
 
-from epuagent.supervisor import UnixProxy
-
-class UnixProxyTests(unittest.TestCase):
+class SupervisorTests(unittest.TestCase):
     def test_error_nofile(self):
         noexist = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
-
-        proxy = UnixProxy(noexist)
-        self.failUnlessFailure(proxy.callRemote("method.name"), ConnectError)
-
-
-
+        noexist = "unix://%s" % noexist
+        soup = Supervisor(noexist)
+        self.assertRaises(SupervisorError, soup.query)
