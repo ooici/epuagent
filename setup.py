@@ -36,4 +36,11 @@ setupdict['test_suite'] = 'epuagent'
 setupdict['install_requires'] = ['gevent==0.13.6',
                                  'dashi==0.1',]
 
+setupdict['entry_points'] = {
+        'console_scripts': [
+            'epu-agent=epuagent.agent:main',
+            ]
+        }
+setupdict['package_data'] = {'epuagent': ['config/*.yml']}
+
 setup(**setupdict)
