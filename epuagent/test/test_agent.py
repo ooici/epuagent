@@ -250,9 +250,9 @@ class TestSubscriber(object):
         except gevent.GreenletExit:
             log.info("Exiting '%s'" % self.id)
 
-    def beat(self, state=None):
-        log.info('Got heartbeat: %s', state)
-        self.last_beat = state
+    def beat(self, heartbeat=None):
+        log.info('Got heartbeat: %s', heartbeat)
+        self.last_beat = heartbeat
         self.beat_count += 1
         self.did_beat.set()
 
