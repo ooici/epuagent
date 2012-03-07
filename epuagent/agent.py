@@ -80,7 +80,8 @@ class EPUAgent(object):
     def heartbeat(self):
         try:
             state = self.core.get_state()
-            self.dashi.fire(self.heartbeat_dest, self.heartbeat_op, state=state)
+            self.dashi.fire(self.heartbeat_dest, self.heartbeat_op,
+                    heartbeat=state)
         except Exception, e:
             # unhandled exceptions will terminate the LoopingCall
             log.error('Error heartbeating: %s', e, exc_info=True)
