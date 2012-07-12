@@ -33,7 +33,7 @@ setupdict['test_suite'] = 'epuagent'
 #setupdict['include_package_data'] = True
 #setupdict['package_data'] = {
 #    'epu': ['data/*.sqlt', 'data/install.sh']
-setupdict['install_requires'] = ['gevent==0.13.6',
+setupdict['install_requires'] = ['gevent==0.13.7',
                                  'dashi==0.1',
                                  'supervisor==3.0a10',
                                  'nose']
