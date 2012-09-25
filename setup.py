@@ -5,7 +5,7 @@
 @see http://peak.telecommunity.com/DevCenter/setuptools
 """
 
-version = '1.1.2'
+version = '1.1.3-dev'
 
 setupdict = {
     'name' : 'epuagent',
