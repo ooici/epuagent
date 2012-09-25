@@ -5,12 +5,14 @@
 @see http://peak.telecommunity.com/DevCenter/setuptools
 """
 
+version = '1.1.1'
+
 setupdict = {
     'name' : 'epuagent',
-    'version' : '1.1.1',
+    'version' : version,
     'description' : 'OOICI CEI Elastic Processing Unit Agents',
     'url': 'https://confluence.oceanobservatories.org/display/CIDev/Common+Execution+Infrastructure+Development',
-    'download_url' : 'http://ooici.net/packages',
+    'download_url' : 'http://sddevrepo.oceanobservatories.org/releases',
     'license' : 'Apache 2.0',
     'author' : 'CEI',
     'author_email' : 'labisso@uchicago.edu',
@@ -28,7 +30,7 @@ setupdict = {
 from setuptools import setup, find_packages
 setupdict['packages'] = find_packages()
 
-setupdict['dependency_links'] = ['http://ooici.net/releases']
+setupdict['dependency_links'] = ['http://ssdevrepo.oceanobservatories.org/releases']
 setupdict['test_suite'] = 'epuagent'
 #setupdict['include_package_data'] = True
 #setupdict['package_data'] = {
