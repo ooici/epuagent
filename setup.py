@@ -38,7 +38,8 @@ setupdict['test_suite'] = 'epuagent'
 setupdict['install_requires'] = ['gevent==0.13.7',
                                  'dashi==0.1',
                                  'supervisor==3.0a10',
-                                 'nose']
+                                ]
+setupdict['tests_require'] = ['nose']
 
 setupdict['entry_points'] = {
         'console_scripts': [
