@@ -1,3 +1,5 @@
+# Copyright 2013 University of Chicago
+
 from __future__ import absolute_import
 import logging
 import xmlrpclib

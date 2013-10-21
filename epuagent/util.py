@@ -1,3 +1,5 @@
+# Copyright 2013 University of Chicago
+
 import os
 
 def disable_ion_busyloop_detect():
